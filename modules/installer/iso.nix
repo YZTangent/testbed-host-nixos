@@ -1,7 +1,7 @@
 # Custom installer ISO with bleeding-edge kernel, Wi-Fi 7 firmware, and nouveau blacklisted.
 # Build command:
 #   nix build .#nixosConfigurations.installer-iso.config.system.build.isoImage
-{ pkgs, modulesPath, ... }:
+{ lib, pkgs, modulesPath, ... }:
 
 {
   imports = [
@@ -28,7 +28,7 @@
 
   # NetworkManager for convenient wifi-menu or nmcli during installation
   networking.networkmanager.enable = true;
-  networking.wireless.enable = false;
+  networking.wireless.enable = lib.mkForce false;
 
   # Useful utilities on the live media
   environment.systemPackages = with pkgs; [
