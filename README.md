@@ -79,20 +79,16 @@ nvidia-smi
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
-### 2. Setup Python Virtualenv & Safari SDK
-Run the automated script:
+### 2. Enter GROD & Safari Environment via Nix Flake
+Simply run:
 ```bash
-./scripts/setup-grod-env.sh
+cd /etc/nixos
+nix develop
 ```
-Or manually:
-```bash
-python3.12 -m venv ~/.venv/safari
-source ~/.venv/safari/bin/activate
-pip install --upgrade pip
-pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-pip install safari-sdk
-pip install git+https://github.com/huggingface/lerobot.git
-pip install absl-py datasets "lerobot[dataset]"
+This automatically provides:
+- Python 3.12, PyTorch with CUDA 12.8, Safari SDK, and LeRobot.
+- All CUDA, OpenGL, and C++ shared libraries in `LD_LIBRARY_PATH`.
+- Direct access to `flywheel-cli`.
 ```
 
 ### 3. Run GROD Inference
