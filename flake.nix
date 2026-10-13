@@ -35,5 +35,11 @@
         ];
       };
     };
+
+    # Convenient shortcuts: `nix build .#iso` or simply `nix build`
+    packages.x86_64-linux = {
+      iso = self.nixosConfigurations.installer-iso.config.system.build.isoImage;
+      default = self.packages.x86_64-linux.iso;
+    };
   };
 }

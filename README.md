@@ -30,7 +30,9 @@ Tailored NixOS configuration implementing the requirements from the **GROD Infer
 ### 1. Boot Installer Media
 - Boot standard NixOS minimal installer or build the custom ISO using:
   ```bash
-  nix build .#nixosConfigurations.installer-iso.config.system.build.isoImage
+  nix build .#iso
+  # or simply:
+  nix build
   ```
 - *If encountering black screen on generic media*: Add `nomodeset` in GRUB/systemd-boot kernel parameters.
 - *If Wi-Fi is not detected*: Plug in smartphone via USB and enable **USB Tethering**.
