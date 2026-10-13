@@ -16,7 +16,6 @@
     shellAliases = {
       ll = "ls -lah";
       nvwatch = "watch -n 1 nvidia-smi";
-      safari-env = "source ~/.venv/safari/bin/activate";
     };
   };
 

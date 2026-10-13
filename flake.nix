@@ -54,8 +54,7 @@
 
         buildInputs = with pkgs; [
           python312
-          python312Packages.virtualenv
-          python312Packages.pip
+          uv
           ffmpeg
           pkg-config
           git
@@ -71,27 +70,15 @@
         ];
 
         shellHook = ''
-          export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath [
-            pkgs.stdenv.cc.cc.lib
-            pkgs.zlib
-            pkgs.glibc
-            pkgs.libGL
-            pkgs.glib
-            pkgs.linuxPackages.nvidia_x11
-            pkgs.cudaPackages.cudatoolkit
-          ]}:$LD_LIBRARY_PATH"
-
-          export VENV_DIR="$HOME/.venv/safari"
+          export VENV_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/grod-venv"
           if [ ! -d "$VENV_DIR" ]; then
-            echo "==> Initializing Python 3.12 virtualenv at $VENV_DIR..."
-            python3.12 -m venv "$VENV_DIR"
+            echo "==> Bootstrapping GROD Python 3.12 virtualenv with uv at $VENV_DIR..."
+            mkdir -p "$(dirname "$VENV_DIR")"
+            uv venv "$VENV_DIR" --python ${pkgs.python312}/bin/python3.12
             source "$VENV_DIR/bin/activate"
             echo "==> Installing PyTorch CUDA 12.8 and Safari SDK..."
-            pip install --upgrade pip
-            pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
-            pip install safari-sdk
-            pip install git+https://github.com/huggingface/lerobot.git
-            pip install absl-py datasets "lerobot[dataset]"
+            uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+            uv pip install safari-sdk "git+https://github.com/huggingface/lerobot.git" absl-py datasets "lerobot[dataset]"
           else
             source "$VENV_DIR/bin/activate"
           fi

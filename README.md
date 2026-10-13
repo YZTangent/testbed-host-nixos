@@ -79,21 +79,23 @@ nvidia-smi
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 ```
 
-### 2. Enter GROD & Safari Environment via Nix Flake
-Simply run:
+### 2. Enter GROD & Safari Environment from Anywhere (`grod`)
+A global `grod` command is available across the entire filesystem:
 ```bash
-cd /etc/nixos
-nix develop
+# Enter interactive GROD subshell in your current directory:
+grod
+
+# Or execute a command directly inside the environment:
+grod flywheel-cli --help
+
+# Force a clean rebuild of the environment (~/.local/share/grod-venv):
+grod --rebuild
 ```
-This automatically provides:
-- Python 3.12, PyTorch with CUDA 12.8, Safari SDK, and LeRobot.
-- All CUDA, OpenGL, and C++ shared libraries in `LD_LIBRARY_PATH`.
-- Direct access to `flywheel-cli`.
-```
+On first run, `grod` uses `uv` to bootstrap Python 3.12, PyTorch CUDA 12.8 (`sm_120`), Safari SDK, and LeRobot into `~/.local/share/grod-venv`.
 
 ### 3. Run GROD Inference
 ```bash
-safari-env
+grod
 flywheel-cli download --artifact_id=grod_model_server_docker_v1_2_1
 flywheel-cli serve \
   --training_recipe=gemini_robotics_on_device_v1 \
