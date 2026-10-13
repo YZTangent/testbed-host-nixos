@@ -26,11 +26,19 @@
   ];
 
   boot.kernelModules = [
-    "mt7921e"
-    "mt7925e"
+    "mt7921e" # Driver for MT7902 (14c3:7902) & MT7921/MT7922
+    "mt7925e" # Driver for MT7925/MT7927
+    "btusb"   # MT7902 Bluetooth component
+    "btmtk"   # MediaTek Bluetooth firmware loader
     "kvm-amd"
     "rndis_host"
     "cdc_ether"
     "cdc_ncm"
   ];
+
+  # MediaTek MT7902 (PCI ID 14c3:7902): Dynamically register device ID to mt7921e driver
+  # if not already built into the kernel's static PCI ID table.
+  services.udev.extraRules = ''
+    ACTION=="add", SUBSYSTEM=="pci", ATTR{vendor}=="0x14c3", ATTR{device}=="0x7902", RUN+="${pkgs.kmod}/bin/modprobe mt7921e", RUN+="${pkgs.bash}/bin/sh -c 'echo 14c3 7902 > /sys/bus/pci/drivers/mt7921e/new_id 2>/dev/null || true'"
+  '';
 }

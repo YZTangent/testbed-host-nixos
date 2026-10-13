@@ -9,9 +9,15 @@
     ../../modules/containers
   ];
 
-  # Bootloader: UEFI systemd-boot
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.systemd-boot.configurationLimit = 10;
+  # Bootloader: GRUB with OS Prober (dual-boots existing Ubuntu automatically)
+  boot.loader.systemd-boot.enable = false;
+  boot.loader.grub = {
+    enable = true;
+    efiSupport = true;
+    device = "nodev";
+    useOSProber = true;
+    configurationLimit = 10;
+  };
   boot.loader.efi.canTouchEfiVariables = true;
 
   # NixOS state version
