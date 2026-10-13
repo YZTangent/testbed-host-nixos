@@ -2,7 +2,11 @@
 
 {
   networking.hostName = "grod-rtx5090";
-  networking.networkmanager.enable = true;
+  networking.networkmanager = {
+    enable = true;
+    # Disable Wi-Fi power saving: MediaTek mt7921e/mt7902 drops scans and connections when powersave is active
+    wifi.powersave = false;
+  };
 
   # Enable OpenSSH daemon for remote lab access and team collaboration
   services.openssh = {

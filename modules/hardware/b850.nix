@@ -7,7 +7,17 @@
 
   # Essential firmware for wireless devices (MediaTek MT7902/MT7921/MT7925, Realtek)
   hardware.enableRedistributableFirmware = true;
-  hardware.firmware = [ pkgs.linux-firmware ];
+  hardware.firmware = with pkgs; [
+    linux-firmware
+    wireless-regdb
+  ];
+
+  # Prevent MediaTek PCIe ASPM sleep hangs & set Singapore regulatory domain for 5GHz/6GHz channels
+  boot.extraModprobeConfig = ''
+    options mt7921e disable_aspm=1
+    options mt7925e disable_aspm=1
+    options cfg80211 ieee80211_regdom="SG"
+  '';
 
   # AMD AM5 CPU optimization: Microcode and autonomous P-state
   hardware.cpu.amd.updateMicrocode = lib.mkDefault true;
