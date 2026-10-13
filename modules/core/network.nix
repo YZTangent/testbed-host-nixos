@@ -26,6 +26,7 @@
       8000  # Default vLLM / model-server API
       8080  # WebUI / monitoring
       11434 # Ollama (if used)
+      60061 # GROD model-server gRPC port (flywheel-cli serve default)
     ];
   };
 }
