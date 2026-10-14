@@ -7,6 +7,7 @@
     ../../modules/hardware
     ../../modules/desktop
     ../../modules/containers
+    ../../modules/grod
   ];
 
   # Bootloader: GRUB with OS Prober (dual-boots existing Ubuntu automatically)
