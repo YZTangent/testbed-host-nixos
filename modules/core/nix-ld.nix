@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 {
   # Enable nix-ld to seamlessly run unmodified pip-installed wheels, PyTorch CUDA 12.8,
@@ -12,7 +12,7 @@
     libGL
     glib
     cudaPackages.cudatoolkit
-    linuxPackages.nvidia_x11
+    config.hardware.nvidia.package
     ffmpeg
     curl
     util-linux

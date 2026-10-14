@@ -1,9 +1,10 @@
-{ pkgs, ... }:
+{ config, pkgs, ... }:
 
 let
   grodFhs = pkgs.buildFHSEnv {
     name = "grod";
     targetPkgs = pkgs: with pkgs; [
+      # Core toolchain & CLI utilities used by flywheel-cli and lerobot
       python312
       uv
       gcc
@@ -13,7 +14,16 @@ let
       cmake
       ninja
       git
+      curl
+      wget
       ffmpeg
+      docker
+
+      # Exact host NVIDIA driver package (provides nvidia-smi, libcuda.so, libnvidia-ml.so
+      # matching the running R570+ kernel module to prevent driver/library version mismatch)
+      config.hardware.nvidia.package
+      cudaPackages.cudatoolkit
+      nvtopPackages.nvidia
 
       # C/Linux headers & shared libs required by evdev, pynput, av, and PyTorch wheels
       linuxHeaders
@@ -31,14 +41,13 @@ let
       libxext
       libxi
       libxtst
-      cudaPackages.cudatoolkit
-      linuxPackages.nvidia_x11
     ];
 
     runScript = pkgs.writeShellScript "grod-init" ''
       set -euo pipefail
       export CPATH="/usr/include:''${CPATH:-}"
       export C_INCLUDE_PATH="/usr/include:''${C_INCLUDE_PATH:-}"
+      export LD_LIBRARY_PATH="/run/opengl-driver/lib:/usr/lib:/usr/lib64:''${LD_LIBRARY_PATH:-}"
       VENV_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/grod-venv"
 
       if [ "''${1:-}" = "--rebuild" ]; then
