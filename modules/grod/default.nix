@@ -110,6 +110,12 @@ let
       export REQUESTS_CA_BUNDLE="/etc/ssl/certs/ca-certificates.crt"
       export GRPC_DEFAULT_SSL_ROOTS_FILE_PATH="/etc/ssl/certs/ca-certificates.crt"
 
+      # Auto-provision Safari SDK API key from sops-nix (/run/secrets/safari_api_key) if available
+      if [ -r "/run/secrets/safari_api_key" ]; then
+        mkdir -p "$HOME/.config/safari_sdk"
+        install -m 600 "/run/secrets/safari_api_key" "$HOME/.config/safari_sdk/API_KEY"
+      fi
+
       VENV_DIR="''${XDG_DATA_HOME:-$HOME/.local/share}/grod-venv"
 
       if [ "''${1:-}" = "--rebuild" ]; then

@@ -7,9 +7,13 @@
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    sops-nix = {
+      url = "github:Mic92/sops-nix";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, home-manager, ... }@inputs: {
+  outputs = { self, nixpkgs, home-manager, sops-nix, ... }@inputs: {
     nixosConfigurations = {
       # Target Machine: B850 + RTX 5090 Workstation
       workstation = nixpkgs.lib.nixosSystem {
@@ -17,6 +21,7 @@
         specialArgs = { inherit inputs; };
         modules = [
           ./hosts/workstation
+          sops-nix.nixosModules.sops
           home-manager.nixosModules.home-manager
           {
             home-manager.useGlobalPkgs = true;

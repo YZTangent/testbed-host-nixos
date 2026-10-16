@@ -6,6 +6,7 @@
     ./network.nix
     ./users.nix
     ./nix-ld.nix
+    ./sops.nix
   ];
 
   time.timeZone = "Asia/Singapore";
