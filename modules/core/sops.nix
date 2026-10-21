@@ -9,11 +9,10 @@ in
   environment.systemPackages = with pkgs; [
     sops
     age
-    ssh-to-age
   ];
 
-  # Automatically derive the machine's age decryption key from its SSH host key
-  sops.age.sshKeyPaths = [ "/etc/ssh/ssh_host_ed25519_key" ];
+  # Dedicated per-testbed age private key provisioned into /var/lib/sops-nix/keys
+  sops.age.keyFile = "/var/lib/sops-nix/keys";
 
   # Activate secret decryption automatically once secrets/secrets.yaml is created
   sops.defaultSopsFile = lib.mkIf hasSecrets secretsFile;

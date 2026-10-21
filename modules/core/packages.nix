@@ -26,6 +26,8 @@
     jq
     tmux
     ripgrep
+    fd
+    zoxide
 
     # GPU and hardware monitoring
     nvtopPackages.nvidia

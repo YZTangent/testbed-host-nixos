@@ -1,7 +1,7 @@
-{ ... }:
+{ lib, ... }:
 
 {
-  networking.hostName = "grod-rtx5090";
+  networking.hostName = lib.mkDefault "prata-host";
   networking.networkmanager = {
     enable = true;
     # Disable Wi-Fi power saving: MediaTek mt7921e/mt7902 drops scans and connections when powersave is active

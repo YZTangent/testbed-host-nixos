@@ -3,11 +3,10 @@
 {
   home.stateVersion = "26.11";
 
-  # User packages
+  # User packages (managed via Home Manager on dev beds)
   home.packages = with pkgs; [
     bat
     eza
-    fd
   ];
 
   # Bash configuration and convenient shortcuts for GROD inference workflow
