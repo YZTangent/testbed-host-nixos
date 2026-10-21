@@ -127,6 +127,80 @@ let
 
     sops_path.write_text("\n".join(lines) + "\n")
   '';
+
+  encryptKeyPinScript = pkgs.writers.writePython3 "prata-encrypt-key-pin" { } ''
+    import fcntl
+    import os
+    import pty
+    import secrets
+    import subprocess
+    import sys
+    import termios
+
+    ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+    HALF_LEN = 4
+
+    plain_path = sys.argv[1]
+    enc_path = sys.argv[2]
+
+    part1 = "".join(secrets.choice(ALPHABET) for _ in range(HALF_LEN))
+    part2 = "".join(secrets.choice(ALPHABET) for _ in range(HALF_LEN))
+    pin = f"{part1}-{part2}"
+
+    master, slave = pty.openpty()
+
+
+    def set_ctty():
+        os.setsid()
+        fcntl.ioctl(slave, termios.TIOCSCTTY, 0)
+
+
+    cmd = [
+        "${pkgs.age}/bin/age",
+        "-p",
+        "-a",
+        "-o",
+        enc_path,
+        plain_path,
+    ]
+    proc = subprocess.Popen(
+        cmd,
+        stdin=slave,
+        stdout=slave,
+        stderr=slave,
+        preexec_fn=set_ctty,
+        close_fds=True,
+    )
+    os.close(slave)
+
+    buf = b""
+    sent_first = False
+    sent_second = False
+    while True:
+        try:
+            chunk = os.read(master, 1024)
+        except OSError:
+            break
+        if not chunk:
+            break
+        buf += chunk
+        if not sent_first and b"Enter passphrase" in buf and b":" in buf:
+            os.write(master, (pin + "\n").encode("utf-8"))
+            sent_first = True
+            buf = b""
+        elif sent_first and not sent_second and b"Confirm passphrase" in buf:
+            if b":" in buf:
+                os.write(master, (pin + "\n").encode("utf-8"))
+                sent_second = True
+                buf = b""
+
+    os.close(master)
+    rc = proc.wait()
+    if rc != 0:
+        raise SystemExit(f"age passphrase encryption failed (exit {rc})")
+
+    print(pin)
+  '';
 in
 pkgs.writeShellApplication {
   name = "provision-testbed";
@@ -145,10 +219,10 @@ pkgs.writeShellApplication {
     Options:
       --profile <prod|dev> Testbed build profile in config/inventory.nix (default: prod)
       --disk <device>      Target NVMe disk device in config/inventory.nix (default: /dev/nvme0n1)
-      --flash <usb-dev>    Write the built ISO with embedded age key directly to <usb-dev> via dd
+      --flash <usb-dev>    Write the built ISO with PIN-encrypted age key directly to <usb-dev> via dd
       --target <user@ip>   Deploy directly over SSH via nixos-anywhere --extra-files (instead of building ISO)
       --repo <path>        Path to repository root (default: current working directory)
-      --dry-run            Generate ephemeral key in /dev/shm, update inventory & .sops.yaml, and exit without building ISO
+      --dry-run            Generate ephemeral key in /dev/shm, update inventory & .sops.yaml, encrypt key with PIN, and exit
     EOF
     }
 
@@ -273,7 +347,7 @@ pkgs.writeShellApplication {
     SHM_DIR="$(mktemp -d "$SHM_BASE/prata-provision.XXXXXX")"
     cleanup() {
       if [ -d "$SHM_DIR" ]; then
-        find "$SHM_DIR" -type f -exec shred -u {} + 2>/dev/null || true
+        find "$SHM_DIR" -type f -exec shred -f -u {} + 2>/dev/null || true
         rm -rf "$SHM_DIR"
       fi
     }
@@ -298,27 +372,40 @@ pkgs.writeShellApplication {
       (cd "$REPO_ROOT/secrets" && sops --config .sops.yaml updatekeys -y secrets.yaml)
     fi
 
-    if [ "$DRY_RUN" -eq 1 ]; then
-      echo "==> Dry run complete. Ephemeral private key will now be shredded from RAM."
-      exit 0
-    fi
-
-    # 4. Provision via Remote SSH (nixos-anywhere) OR Build/Flash Installer ISO
+    # 4. Provision via Remote SSH (nixos-anywhere) OR Encrypt with One-Time PIN & Build/Flash ISO
     if [ -n "$TARGET_SSH" ]; then
+      if [ "$DRY_RUN" -eq 1 ]; then
+        echo "==> Dry run complete. Ephemeral private key will now be shredded from RAM."
+        exit 0
+      fi
       echo "==> Provisioning '$HOST_NAME' remotely on '$TARGET_SSH' via nixos-anywhere..."
       nixos-anywhere \
         --extra-files "$SHM_DIR" \
         --flake "''${REPO_ROOT}#''${HOST_NAME}" \
         "$TARGET_SSH"
     else
-      echo "==> Building installer ISO with embedded age key for '$HOST_NAME'..."
+      ENC_KEY_FILE="$SHM_DIR/keys.age"
+      echo "==> Encrypting ephemeral age private key with One-Time PIN..."
+      OTP_PIN="$(${encryptKeyPinScript} "$KEY_FILE" "$ENC_KEY_FILE")"
+      chmod 0400 "$ENC_KEY_FILE"
+      shred -f -u "$KEY_FILE"
+      echo "==> Plaintext private key shredded from RAM before ISO build."
+      echo "==> One-Time Install PIN for '$HOST_NAME': $OTP_PIN"
+
+      if [ "$DRY_RUN" -eq 1 ]; then
+        echo "==> Dry run complete. Ephemeral encrypted key will now be shredded from RAM."
+        exit 0
+      fi
+
+      echo "==> Building installer ISO with PIN-encrypted age key for '$HOST_NAME'..."
       ISO_OUT="$(
-        PRATA_ISO_AGE_KEY_FILE="$KEY_FILE" \
+        PRATA_ISO_AGE_KEY_FILE="$ENC_KEY_FILE" \
         PRATA_ISO_TARGET_HOST="$HOST_NAME" \
         nix build --impure "''${REPO_ROOT}#iso" --no-link --print-out-paths
       )"
       ISO_IMG="$(find "$ISO_OUT/iso" -name '*.iso' | head -n1)"
       echo "==> Built ISO: $ISO_IMG"
+      echo "==> IMPORTANT: Record One-Time Install PIN for '$HOST_NAME': $OTP_PIN"
 
       if [ -n "$FLASH_DEV" ]; then
         echo "==> Flashing $ISO_IMG to $FLASH_DEV..."

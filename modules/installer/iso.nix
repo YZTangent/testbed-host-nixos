@@ -1,5 +1,5 @@
 # Custom installer ISO with bleeding-edge kernel, Wi-Fi 7 firmware, nouveau blacklisted,
-# optional embedded per-testbed age private key (/etc/sops/age/keys), and 1-step `install-testbed` CLI.
+# optional PIN-encrypted per-testbed age private key (/etc/sops/age/keys.age), and 1-step `install-testbed` CLI.
 { inputs, lib, pkgs, modulesPath, ... }:
 
 let
@@ -33,12 +33,23 @@ let
       --mode destroy,format,mount \
       --flake "''${FLAKE_SRC}#''${HOST}"
 
-    if [ -f "/etc/sops/age/keys" ]; then
+    if [ -f "/etc/sops/age/keys.age" ]; then
+      echo "==> Decrypting /etc/sops/age/keys.age to /mnt/var/lib/sops-nix/keys (enter One-Time Install PIN)..."
+      install -d -m 0700 -o 0 -g 0 /mnt/var/lib/sops-nix
+      (
+        umask 0077
+        until ${pkgs.age}/bin/age -d -o /mnt/var/lib/sops-nix/keys /etc/sops/age/keys.age; do
+          echo "WARNING: Decryption failed (incorrect PIN). Please try again." >&2
+        done
+      )
+      chmod 0400 /mnt/var/lib/sops-nix/keys
+      chown 0:0 /mnt/var/lib/sops-nix/keys
+    elif [ -f "/etc/sops/age/keys" ]; then
       echo "==> Installing pre-baked age private key to /mnt/var/lib/sops-nix/keys..."
-      install -d -m 0700 /mnt/var/lib/sops-nix
+      install -d -m 0700 -o 0 -g 0 /mnt/var/lib/sops-nix
       install -m 0400 -o 0 -g 0 /etc/sops/age/keys /mnt/var/lib/sops-nix/keys
     else
-      echo "WARNING: /etc/sops/age/keys not found on ISO; target will boot without pre-staged SOPS key." >&2
+      echo "WARNING: /etc/sops/age/keys.age not found on ISO; target will boot without pre-staged SOPS key." >&2
     fi
 
     echo "==> Installing NixOS configuration ''${FLAKE_SRC}#''${HOST}..."
@@ -74,11 +85,11 @@ in
   networking.networkmanager.enable = true;
   networking.wireless.enable = lib.mkForce false;
 
-  # Embed a clean copy of the repo flake at /etc/prata-nixos and optional age key at /etc/sops/age/keys
+  # Embed a clean copy of the repo flake at /etc/prata-nixos and optional PIN-encrypted age key at /etc/sops/age/keys.age
   environment.etc = {
     "prata-nixos".source = inputs.self;
   } // lib.optionalAttrs hasIsoAgeKey {
-    "sops/age/keys" = {
+    "sops/age/keys.age" = {
       text = builtins.readFile isoAgeKeyEnv;
       mode = "0400";
       uid = 0;

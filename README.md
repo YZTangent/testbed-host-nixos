@@ -27,14 +27,14 @@ Tailored NixOS configuration implementing the requirements from the **GROD Infer
 6. **Declarative Disk Layout (`disko`), Dynamic Swap, & Ephemeral SOPS Key Provisioning**:
    - Per-testbed inventory in `config/inventory.nix` with SOPS recipients in `secrets/.sops.yaml`.
    - Automated GPT partitioning (`1024M` `/boot` ESP + `100%` ext4 `/`) via `disko` and dynamic `/var/swapfile` (`min(20% of disk, 128 GiB)`).
-   - Zero-plaintext-key persistence on the provisioning host: `nix run .#provision` generates the testbed's `age` keypair strictly in `/dev/shm` (RAM), updates `config/inventory.nix` and `secrets/.sops.yaml`, re-keys `secrets/secrets.yaml`, embeds the private key into the installer ISO (or deploys over SSH), and `shred`s the key from RAM on exit.
+   - Zero-plaintext-key persistence on the provisioning host, `/nix/store`, and USB media: `nix run .#provision` generates the testbed's `age` keypair strictly in `/dev/shm` (RAM), updates `config/inventory.nix` and `secrets/.sops.yaml`, re-keys `secrets/secrets.yaml`, encrypts the private key in RAM (`keys.age`) with a generated One-Time PIN (`XXXX-XXXX`), immediately `shred`s the plaintext private key from RAM before `nix build` runs, and embeds only the ciphertext (`/etc/sops/age/keys.age`) into the installer ISO.
 
 ---
 
 ## Provisioning & Installation Workflow
 
 ### 1. Provision a Testbed on Dev Machine / Cloudtop
-Generate a per-testbed `age` key in RAM, register the host in `config/inventory.nix` and `secrets/.sops.yaml`, re-key `secrets/secrets.yaml`, and build (or flash) the custom installer ISO:
+Generate a per-testbed `age` key in RAM, register the host in `config/inventory.nix` and `secrets/.sops.yaml`, re-key `secrets/secrets.yaml`, encrypt the private key with a One-Time Install PIN (`XXXX-XXXX`), and build (or flash) the custom installer ISO:
 
 ```bash
 # Prod testbed (default: prata-admin + prata only):
@@ -46,6 +46,8 @@ nix run .#provision -- prata-dev-01 --profile dev --flash /dev/sdX
 # Or deploy directly over SSH to a live NixOS installer via nixos-anywhere:
 nix run .#provision -- prata-tb-01 --target root@<target-ip>
 ```
+
+Record the printed `One-Time Install PIN` (`XXXX-XXXX`) to enter on the bare-metal console during installation.
 
 To edit encrypted secrets manually:
 ```bash
@@ -61,7 +63,7 @@ sudo install-testbed prata-tb-01
 ```
 `install-testbed` automatically:
 1. Formats and mounts the target NVMe disk via `disko` (`ESP` at `/boot`, `ext4` at `/`).
-2. Installs the embedded `/etc/sops/age/keys` into `/mnt/var/lib/sops-nix/keys` (`0400`, `root:root`).
+2. Prompts for the One-Time Install PIN (`XXXX-XXXX`) to decrypt `/etc/sops/age/keys.age` into `/mnt/var/lib/sops-nix/keys` (`0400`, `root:root`).
 3. Runs `nixos-install --flake /etc/prata-nixos#<hostName> --no-root-passwd`.
 
 Reboot into the installed system when complete:

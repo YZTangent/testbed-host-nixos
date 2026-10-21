@@ -25,11 +25,11 @@ Provisioning NixOS testbed machines currently suffers from four operational bott
    - **Dev / Cloudtop / CI Utility (`nix run .#provision -- <hostName> [--profile prod|dev]`):**
      1. Generates a unique `age` keypair (`age-keygen`) for `<hostName>` strictly in ephemeral memory (`/dev/shm`), never persisting the private key to the dev machine's disk.
      2. Updates `config/inventory.nix` and `secrets/.sops.yaml` (moved from root `.sops.yaml` into `secrets/.sops.yaml`) with `<hostName>`'s `agePublicKey`, and runs `sops updatekeys -y secrets/secrets.yaml`.
-     3. Either builds the installer ISO with the in-memory `age` private key baked into `/etc/sops/age/keys` (`0400`) and optionally flashes it to USB (`--flash <device>`), OR deploys directly over SSH via `nixos-anywhere --extra-files` (`--target root@<ip>`) directly from the `/dev/shm` staging directory, wiping `/dev/shm` upon exit.
+     3. Either encrypts the in-memory `age` private key with a random One-Time PIN (`XXXX-XXXX`) into `keys.age`, immediately shreds the plaintext private key in `/dev/shm`, builds the installer ISO with only the ciphertext baked into `/etc/sops/age/keys.age` (`0400`), and optionally flashes it to USB (`--flash <device>`), OR deploys directly over SSH via `nixos-anywhere --extra-files` (`--target root@<ip>`) directly from the `/dev/shm` staging directory, wiping `/dev/shm` upon exit.
    - **Target Bare-Metal Utility (`install-testbed`, shipped inside the ISO):**
      1. Runs on the bare-metal testbed booted from the USB ISO.
      2. Formats and mounts the NVMe disk via `disko`.
-     3. Copies `/etc/sops/age/keys` from the ISO to `/mnt/var/lib/sops-nix/keys` (`0400 root:root`).
+     3. Prompts for the One-Time PIN to decrypt `/etc/sops/age/keys.age` from the ISO into `/mnt/var/lib/sops-nix/keys` (`0400 root:root`).
      4. Runs `nixos-install --flake ...#<hostName> --no-root-passwd`.
      5. Boot #1 immediately decrypts `secrets/secrets.yaml` using `/var/lib/sops-nix/keys` with zero post-boot steps.
 3. **Declarative Disk Layout (`disko`) + Configurable Dynamic Swap:**
@@ -67,7 +67,7 @@ modules/core/
   sops.nix                        # Updated: sops.age.keyFile = "/var/lib/sops-nix/keys"
   provision.nix                   # New: provision-testbed (dev/cloud CLI) derivation
 modules/installer/
-  iso.nix                         # Updated: embeds target age key at /etc/sops/age/keys & ships install-testbed
+  iso.nix                         # Updated: embeds PIN-encrypted age key at /etc/sops/age/keys.age & ships install-testbed
 ```
 
 ### 4.2 Declarative Inventory (`config/inventory.nix`) & Prod/Dev Profiles (`modules/core/users.nix`)
@@ -122,30 +122,31 @@ When `prata.swap.enable = true`, systemd service `prata-swapfile.service` (`befo
 sequenceDiagram
     participant Dev as Dev / Cloudtop (provision-testbed in /dev/shm)
     participant Git as Repo (config/inventory.nix & secrets/.sops.yaml)
-    participant Target as ISO (/etc/sops/age/keys) or SSH (--extra-files)
+    participant Target as ISO (/etc/sops/age/keys.age) or SSH (--extra-files)
     participant Host as Bare-Metal Testbed (install-testbed)
 
     Dev->>Dev: 1. Generate age keypair in RAM (/dev/shm/prata-provision.XXXXXX)
     Dev->>Git: 2. Write hostName + profile + agePublicKey to config/inventory.nix & secrets/.sops.yaml
     Dev->>Git: 3. Run `sops updatekeys -y secrets/secrets.yaml`
-    Dev->>Target: 4. Bake key into ISO (or push via nixos-anywhere --extra-files), then wipe /dev/shm
-    Target->>Host: 5. Boot USB ISO & run `install-testbed` (if ISO mode)
-    Host->>Host: 6. disko format + copy /etc/sops/age/keys -> /mnt/var/lib/sops-nix/keys + nixos-install
+    Dev->>Dev: 4. Encrypt key with One-Time PIN (keys.age) & shred plaintext key
+    Dev->>Target: 5. Bake keys.age into ISO (or push via nixos-anywhere --extra-files), then wipe /dev/shm
+    Target->>Host: 6. Boot USB ISO & run `install-testbed` (if ISO mode)
+    Host->>Host: 7. disko format + decrypt /etc/sops/age/keys.age with PIN -> /mnt/var/lib/sops-nix/keys + nixos-install
 ```
 
 1. **Dev / Cloudtop Utility (`provision-testbed` via `nix run .#provision`):**
    - Usage: `nix run .#provision -- <hostName> [--profile prod|dev] [--disk /dev/nvme0n1] [--flash /dev/sdX | --target root@<ip>]`
-   - Step 1: Creates an ephemeral directory in RAM (`mktemp -d /dev/shm/prata-provision.XXXXXX` with `trap 'rm -rf "$SHM_DIR"' EXIT`) and runs `age-keygen` into `$SHM_DIR/var/lib/sops-nix/keys` (`0400`), extracting the `age1...` public key in memory.
+   - Step 1: Creates an ephemeral directory in RAM (`mktemp -d /dev/shm/prata-provision.XXXXXX` with `trap cleanup EXIT INT TERM`) and runs `age-keygen` into `$SHM_DIR/var/lib/sops-nix/keys` (`0400`), extracting the `age1...` public key in memory.
    - Step 2: Updates `config/inventory.nix` with `<hostName>`, `profile`, and its new `agePublicKey`.
    - Step 3: Regenerates host recipients in `secrets/.sops.yaml` (preserving admin keys) and runs `sops updatekeys -y secrets/secrets.yaml` (if `secrets/secrets.yaml` exists).
    - Step 4:
-     - **Default / `--flash <dev>` (ISO mode):** Builds `.#iso` using `--impure` with `PRATA_ISO_AGE_KEY_FILE="$SHM_DIR/var/lib/sops-nix/keys"` and `PRATA_ISO_TARGET_HOST="<hostName>"` so the ISO embeds `/etc/sops/age/keys` (`0400`) and defaults `install-testbed` to `<hostName>`. If `--flash <dev>` is specified, writes the ISO to the USB device via `dd`.
+     - **Default / `--flash <dev>` (ISO mode):** Encrypts `$SHM_DIR/var/lib/sops-nix/keys` into `$SHM_DIR/keys.age` (`0400`) using a random One-Time PIN (`XXXX-XXXX`), immediately `shred -u`s the plaintext private key in `/dev/shm`, and builds `.#iso` using `--impure` with `PRATA_ISO_AGE_KEY_FILE="$SHM_DIR/keys.age"` and `PRATA_ISO_TARGET_HOST="<hostName>"` so `/nix/store` and the ISO only ever contain ciphertext (`/etc/sops/age/keys.age`). Prints the One-Time PIN for the operator. If `--flash <dev>` is specified, writes the ISO to the USB device via `dd`.
      - **`--target <user@ip>` (Remote SSH mode):** Runs `nixos-anywhere --extra-files "$SHM_DIR" --flake ".#<hostName>" "$target"` to partition the remote disk via `disko` and place `/var/lib/sops-nix/keys` (`0400`) directly onto the target filesystem.
    - Step 5: `EXIT` trap shreds and removes `$SHM_DIR` from RAM—no private key remains on the dev machine.
 2. **Target Bare-Metal Utility (`install-testbed` inside `modules/installer/iso.nix`):**
    - Usage on live USB console: `sudo install-testbed [<hostName>]` (defaults to the `<hostName>` baked into the ISO, or `prata-host`).
    - Step 1: Runs `disko --mode destroy,format,mount` for `<hostName>`.
-   - Step 2: Installs `/etc/sops/age/keys` (if present on ISO) to `/mnt/var/lib/sops-nix/keys` (`0400 root:root`).
+   - Step 2: Prompts for the One-Time Install PIN to decrypt `/etc/sops/age/keys.age` into `/mnt/var/lib/sops-nix/keys` (`0400 root:root`).
    - Step 3: Runs `nixos-install --flake "<iso-flake>#<hostName>" --no-root-passwd`.
 
 ## 5. Verification Plan
