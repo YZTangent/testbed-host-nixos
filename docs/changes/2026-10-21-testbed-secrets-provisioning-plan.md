@@ -24,7 +24,7 @@
 - Modify: `modules/core/network.nix:1-10`
 - Modify: `modules/core/sops.nix:1-28`
 
-- [ ] **Step 1: Verify current inventory, profile option, hostname, and SOPS config fail the new expectations**
+- [x] **Step 1: Verify current inventory, profile option, hostname, and SOPS config fail the new expectations**
 
 Run:
 ```bash
@@ -33,7 +33,7 @@ test -f config/inventory.nix && test -f secrets/.sops.yaml
 ```
 Expected: FAIL (exit code 1; `config/inventory.nix` and `secrets/.sops.yaml` do not exist yet).
 
-- [ ] **Step 2: Create `.gitignore`, `config/inventory.nix`, move `.sops.yaml` to `secrets/.sops.yaml`, and update `users.nix`, `packages.nix`, `home/default.nix`, `network.nix`, and `sops.nix`**
+- [x] **Step 2: Create `.gitignore`, `config/inventory.nix`, move `.sops.yaml` to `secrets/.sops.yaml`, and update `users.nix`, `packages.nix`, `home/default.nix`, `network.nix`, and `sops.nix`**
 
 Create `.gitignore`:
 ```gitignore
@@ -308,7 +308,7 @@ in
 }
 ```
 
-- [ ] **Step 3: Run evaluation checks to verify `config/inventory.nix`, `network.nix`, and `sops.nix`**
+- [x] **Step 3: Run evaluation checks to verify `config/inventory.nix`, `network.nix`, and `sops.nix`**
 
 Run:
 ```bash
@@ -326,11 +326,11 @@ Expected:
 "/var/lib/sops-nix/keys"
 ```
 
-- [ ] **Step 4: Strictly follow the implementer's subagents**
+- [x] **Step 4: Strictly follow the implementer's subagents**
 
 Ensure to strictly follow the implementer's subagents workflow within the SDLC verification loop to handle any code reviews (regressions, sanitation, vulnerability) and ensure quality before committing.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```bash
 cd /usr/local/google/home/tanyuanzheng/code/nixos-b850-5090/.worktree/testbed-secrets-provisioning
@@ -350,7 +350,7 @@ git commit -m "feat(core): add config/inventory.nix, prod/dev user profiles, and
 - Modify: `hosts/workstation/hardware-configuration.nix`
 - Modify: `flake.nix`
 
-- [ ] **Step 1: Verify `prata.swap` and `prata.diskDevice` options do not exist yet**
+- [x] **Step 1: Verify `prata.swap` and `prata.diskDevice` options do not exist yet**
 
 Run:
 ```bash
@@ -359,7 +359,7 @@ nix eval .#nixosConfigurations.workstation.config.prata.swap.maxSizeGiB
 ```
 Expected: FAIL with `error: attribute 'swap' missing`.
 
-- [ ] **Step 2: Create `modules/core/disko.nix` and `modules/core/swap.nix`, and wire into `modules/core/default.nix`, `hardware-configuration.nix`, and `flake.nix`**
+- [x] **Step 2: Create `modules/core/disko.nix` and `modules/core/swap.nix`, and wire into `modules/core/default.nix`, `hardware-configuration.nix`, and `flake.nix`**
 
 Create `modules/core/disko.nix`:
 ```nix
@@ -624,7 +624,7 @@ Update `flake.nix` to include `disko` input and map `config/inventory.nix` via `
 }
 ```
 
-- [ ] **Step 3: Run tests to verify `prod` vs `dev` user/Home Manager gating, `disko`, and dynamic swap calculation (`min(20%, 128 GiB)`)**
+- [x] **Step 3: Run tests to verify `prod` vs `dev` user/Home Manager gating, `disko`, and dynamic swap calculation (`min(20%, 128 GiB)`)**
 
 Run:
 ```bash
@@ -653,11 +653,11 @@ true
 PASS
 ```
 
-- [ ] **Step 4: Strictly follow the implementer's subagents**
+- [x] **Step 4: Strictly follow the implementer's subagents**
 
 Ensure to strictly follow the implementer's subagents workflow within the SDLC verification loop to handle any code reviews (regressions, sanitation, vulnerability) and ensure quality before committing.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```bash
 cd /usr/local/google/home/tanyuanzheng/code/nixos-b850-5090/.worktree/testbed-secrets-provisioning
@@ -672,7 +672,7 @@ git commit -m "feat(storage): add disko declarative partitioning, dynamic swapfi
 **Files:**
 - Modify: `modules/installer/iso.nix`
 
-- [ ] **Step 1: Verify `install-testbed` is not yet present in `installer-iso`**
+- [x] **Step 1: Verify `install-testbed` is not yet present in `installer-iso`**
 
 Run:
 ```bash
@@ -681,7 +681,7 @@ nix eval --json .#nixosConfigurations.installer-iso.config.environment.systemPac
 ```
 Expected: FAIL (exit code 1).
 
-- [ ] **Step 2: Update `modules/installer/iso.nix` to embed ephemeral `/etc/sops/age/keys` when `PRATA_ISO_AGE_KEY_FILE` is provided and ship `install-testbed`**
+- [x] **Step 2: Update `modules/installer/iso.nix` to embed ephemeral `/etc/sops/age/keys` when `PRATA_ISO_AGE_KEY_FILE` is provided and ship `install-testbed`**
 
 Update `modules/installer/iso.nix`:
 ```nix
@@ -786,7 +786,7 @@ in
 }
 ```
 
-- [ ] **Step 3: Verify `install-testbed` and `/etc/sops/age/keys` injection evaluate cleanly**
+- [x] **Step 3: Verify `install-testbed` and `/etc/sops/age/keys` injection evaluate cleanly**
 
 Run:
 ```bash
@@ -803,11 +803,11 @@ Expected:
 "0400"
 ```
 
-- [ ] **Step 4: Strictly follow the implementer's subagents**
+- [x] **Step 4: Strictly follow the implementer's subagents**
 
 Ensure to strictly follow the implementer's subagents workflow within the SDLC verification loop to handle any code reviews (regressions, sanitation, vulnerability) and ensure quality before committing.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```bash
 cd /usr/local/google/home/tanyuanzheng/code/nixos-b850-5090/.worktree/testbed-secrets-provisioning
@@ -824,7 +824,7 @@ git commit -m "feat(iso): embed ephemeral age private key and ship 1-step instal
 - Modify: `flake.nix`
 - Modify: `README.md`
 
-- [ ] **Step 1: Verify `.#provision` flake output does not exist yet**
+- [x] **Step 1: Verify `.#provision` flake output does not exist yet**
 
 Run:
 ```bash
@@ -833,7 +833,7 @@ nix eval .#packages.x86_64-linux.provision.name
 ```
 Expected: FAIL with `error: flake ... does not provide attribute 'packages.x86_64-linux.provision'`.
 
-- [ ] **Step 2: Create `modules/core/provision.nix` and wire `.#provision` into `flake.nix` and `README.md`**
+- [x] **Step 2: Create `modules/core/provision.nix` and wire `.#provision` into `flake.nix` and `README.md`**
 
 Create `modules/core/provision.nix`:
 ```nix
@@ -1198,7 +1198,7 @@ Update `README.md` (lines 28-68) to document `nix run .#provision -- <hostName> 
    ```
 ```
 
-- [ ] **Step 3: Test `provision-testbed --dry-run` (both `prod` and `dev`) in an isolated temp copy and run `nix flake check`**
+- [x] **Step 3: Test `provision-testbed --dry-run` (both `prod` and `dev`) in an isolated temp copy and run `nix flake check`**
 
 Run:
 ```bash
@@ -1223,11 +1223,11 @@ Expected:
 PASS
 ```
 
-- [ ] **Step 4: Strictly follow the implementer's subagents**
+- [x] **Step 4: Strictly follow the implementer's subagents**
 
 Ensure to strictly follow the implementer's subagents workflow within the SDLC verification loop to handle any code reviews (regressions, sanitation, vulnerability) and ensure quality before committing.
 
-- [ ] **Step 5: Commit Task 4**
+- [x] **Step 5: Commit Task 4**
 
 ```bash
 cd /usr/local/google/home/tanyuanzheng/code/nixos-b850-5090/.worktree/testbed-secrets-provisioning

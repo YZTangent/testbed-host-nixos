@@ -20,49 +20,52 @@ Tailored NixOS configuration implementing the requirements from the **GROD Infer
 4. **Nix-LD for PyTorch & Safari SDK**:
    - `programs.nix-ld.enable = true` allows unmodified pip-installed wheels (`torch cu128`, `safari-sdk`, `lerobot`, `gemini-robotics-sdk`) to run seamlessly inside virtualenvs without dynamic linker errors.
 
-5. **Multi-User Team Isolation**:
-   - Dedicated user accounts for `tanyuanzheng`, `jiehao`, `zhin`, and `danielkun` with isolated home environments and SSH access.
+5. **Prod vs Dev Testbed Profiles (`prata.profile`)**:
+   - **`prod` (default)**: Provisions only `prata-admin` (`wheel`, `docker`, `video`, `networkmanager`) and `prata` (`docker`, `video`, `networkmanager`) with standard system packages (`git`, `ripgrep`, `fd`, `zoxide`, `tmux`, `nvtop`) and no Home Manager overhead.
+   - **`dev`**: Adds developer accounts (`tanyuanzheng`, `jiehao`, `zhin`, `danielkun`) managed with Home Manager (`bat`, `eza`, bash/git user config).
+
+6. **Declarative Disk Layout (`disko`), Dynamic Swap, & Ephemeral SOPS Key Provisioning**:
+   - Per-testbed inventory in `config/inventory.nix` with SOPS recipients in `secrets/.sops.yaml`.
+   - Automated GPT partitioning (`1024M` `/boot` ESP + `100%` ext4 `/`) via `disko` and dynamic `/var/swapfile` (`min(20% of disk, 128 GiB)`).
+   - Zero-plaintext-key persistence on the provisioning host: `nix run .#provision` generates the testbed's `age` keypair strictly in `/dev/shm` (RAM), updates `config/inventory.nix` and `secrets/.sops.yaml`, re-keys `secrets/secrets.yaml`, embeds the private key into the installer ISO (or deploys over SSH), and `shred`s the key from RAM on exit.
 
 ---
 
-## Installation Steps on Target Machine
+## Provisioning & Installation Workflow
 
-### 1. Boot Installer Media
-- Boot standard NixOS minimal installer or build the custom ISO using:
-  ```bash
-  nix build .#iso
-  # or simply:
-  nix build
-  ```
-- *If encountering black screen on generic media*: Add `nomodeset` in GRUB/systemd-boot kernel parameters.
-- *If Wi-Fi is not detected*: Plug in smartphone via USB and enable **USB Tethering**.
+### 1. Provision a Testbed on Dev Machine / Cloudtop
+Generate a per-testbed `age` key in RAM, register the host in `config/inventory.nix` and `secrets/.sops.yaml`, re-key `secrets/secrets.yaml`, and build (or flash) the custom installer ISO:
 
-### 2. Disk Partitioning & Mount
-Format target NVMe disk (e.g. `/dev/nvme0n1`):
 ```bash
-# Example EFI + Root partition
-parted /dev/nvme0n1 -- mklabel gpt
-parted /dev/nvme0n1 -- mkpart ESP fat32 1MiB 1024MiB
-parted /dev/nvme0n1 -- set 1 esp on
-parted /dev/nvme0n1 -- mkpart root ext4 1024MiB 100%
+# Prod testbed (default: prata-admin + prata only):
+nix run .#provision -- prata-tb-01 --flash /dev/sdX
 
-mkfs.fat -F 32 -n boot /dev/nvme0n1p1
-mkfs.ext4 -L nixos /dev/nvme0n1p2
+# Dev testbed (adds developer accounts + Home Manager):
+nix run .#provision -- prata-dev-01 --profile dev --flash /dev/sdX
 
-mount /dev/disk/by-label/nixos /mnt
-mkdir -p /mnt/boot
-mount /dev/disk/by-label/boot /mnt/boot
+# Or deploy directly over SSH to a live NixOS installer via nixos-anywhere:
+nix run .#provision -- prata-tb-01 --target root@<target-ip>
 ```
 
-### 3. Clone Config & Generate Hardware Config
+To edit encrypted secrets manually:
 ```bash
-git clone https://github.com/<your-repo>/nixos-b850-5090 /mnt/etc/nixos
-nixos-generate-config --root /mnt --show-hardware-config > /mnt/etc/nixos/hosts/workstation/hardware-configuration.nix
+sops --config secrets/.sops.yaml secrets/secrets.yaml
 ```
 
-### 4. Install & Reboot
+### 2. Boot Installer Media & Run 1-Step Bare-Metal Install
+Boot the target machine from the flashed USB installer and run:
 ```bash
-nixos-install --flake /mnt/etc/nixos#workstation
+sudo install-testbed
+# Or specify a host explicitly:
+sudo install-testbed prata-tb-01
+```
+`install-testbed` automatically:
+1. Formats and mounts the target NVMe disk via `disko` (`ESP` at `/boot`, `ext4` at `/`).
+2. Installs the embedded `/etc/sops/age/keys` into `/mnt/var/lib/sops-nix/keys` (`0400`, `root:root`).
+3. Runs `nixos-install --flake /etc/prata-nixos#<hostName> --no-root-passwd`.
+
+Reboot into the installed system when complete:
+```bash
 reboot
 ```
 

@@ -21,6 +21,8 @@
     let
       system = "x86_64-linux";
       lib = nixpkgs.lib;
+      pkgs = nixpkgs.legacyPackages.${system};
+      provisionPkg = import ./modules/core/provision.nix { inherit pkgs; };
       inventory = import ./config/inventory.nix;
 
       mkTestbed = _: hostCfg:
@@ -62,7 +64,16 @@
 
       packages.${system} = {
         iso = self.nixosConfigurations.installer-iso.config.system.build.isoImage;
+        provision = provisionPkg;
         default = self.packages.${system}.iso;
+      };
+
+      apps.${system} = {
+        provision = {
+          type = "app";
+          program = "${provisionPkg}/bin/provision-testbed";
+          meta.description = "Provision a PRATA NixOS testbed with an ephemeral RAM age keypair";
+        };
       };
     };
 }

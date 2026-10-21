@@ -79,7 +79,7 @@ in
     "prata-nixos".source = inputs.self;
   } // lib.optionalAttrs hasIsoAgeKey {
     "sops/age/keys" = {
-      source = /. + isoAgeKeyEnv;
+      text = builtins.readFile isoAgeKeyEnv;
       mode = "0400";
       uid = 0;
       gid = 0;
